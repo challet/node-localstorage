@@ -42,7 +42,7 @@
   },
   "license": "MIT",
   "dependencies": {
-    "mock-fs": "^4.10.4",
+    "mock-fs": "^3.12.1",
     "write-file-atomic": "^1.1.4"
   }
 }

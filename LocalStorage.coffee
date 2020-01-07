@@ -11,7 +11,7 @@ KEY_FOR_EMPTY_STRING = '---.EMPTY_STRING.---'  # Chose something that no one is 
 _emptyDirectory = (target) ->
   _rm(path.join(target, p)) for p in fs.readdirSync(target)
 
-_rm = (target) ->
+_rm = (fs, target) ->
   if fs.statSync(target).isDirectory()
     _emptyDirectory(target)
     fs.rmdirSync(target)
@@ -50,11 +50,11 @@ createMap = -> # createMap contains Metakeys as properties
   return new Map()
 
 mountMemoryFs = ->
-  # create only one directory, the path being of the os tmp one
-  mockFs {},
+  # create only one directory, the path being the os tmp one
+  return mockFs.fs({},
     createCwd: false
     createTmp: true
-  return os.tmpdir();
+  );
 
 unmountMemoryFs = ->
   mockFs.restore();
@@ -72,7 +72,8 @@ class LocalStorage extends events.EventEmitter
     
     # no location is in-memory mode
     @_memoryFs = @_location is null
-    @_location = mountMemoryFs() if @_memoryFs
+    @_location = os.tmpdir() if @_memoryFs
+    @_fs = if @_memoryFs then mountMemoryFs() else fs
     
     @_location = path.resolve(@_location)
 
@@ -110,14 +111,14 @@ class LocalStorage extends events.EventEmitter
     
   _init: () ->
     try
-      stat = fs.statSync(@_location)
+      stat = @_fs.statSync(@_location)
       if stat? and not stat.isDirectory()
         throw new Error("A file exists at the location '#{@_location}' when trying to create/open localStorage")
       # At this point, it exists and is definitely a directory. So read it.
       @_bytesInUse = 0
       @length = 0
 
-      _keys = fs.readdirSync(@_location)
+      _keys = @_fs.readdirSync(@_location)
       for k, index in _keys
         _decodedKey = decodeURIComponent(k)
         @_keys.push(_decodedKey)
@@ -135,7 +136,7 @@ class LocalStorage extends events.EventEmitter
       if e.code != "ENOENT"
         throw e
       try
-        fs.mkdirSync(@_location)
+        @_fs.mkdirSync(@_location)
       catch e
         if e.code != "EEXIST"
           throw e
@@ -175,7 +176,7 @@ class LocalStorage extends events.EventEmitter
     metaKey = @_metaKeyMap[key]
     if !!metaKey
       filename = path.join(@_location, metaKey.key)
-      return fs.readFileSync(filename, 'utf8')
+      return @_fs.readFileSync(filename, 'utf8')
     else
       return null
 
@@ -183,7 +184,7 @@ class LocalStorage extends events.EventEmitter
     key = _escapeKey(key)
     filename = path.join(@_location, encodeURIComponent(key))
     try
-      return fs.statSync(filename)
+      return @_fs.statSync(filename)
     catch
       return null
 
